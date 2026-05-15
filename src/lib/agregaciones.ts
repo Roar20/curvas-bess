@@ -6,6 +6,7 @@ import {
   getQuarter,
   getYear,
 } from "date-fns";
+import type { DiaDetalle, DiasDetalle } from "@/types/bess";
 
 export type Granularidad =
   | "dia"
@@ -84,6 +85,15 @@ export const ARTICULO_PLURAL_GRAN: Record<Granularidad, string> = {
   trimestre: "los",
   semestre: "los",
   anio: "los",
+};
+
+export const SOC_LABEL: Record<Granularidad, string> = {
+  dia: "SOC máx diario",
+  semana: "SOC máx semanal",
+  mes: "SOC máx mensual",
+  trimestre: "SOC máx trimestral",
+  semestre: "SOC máx semestral",
+  anio: "SOC máx anual",
 };
 
 export function granularidadesDisponibles(dias: number): Granularidad[] {
@@ -209,6 +219,74 @@ export function agregarPorGranularidad(
     });
   }
 
+  buckets.sort((a, b) => a.fechaInicio.localeCompare(b.fechaInicio));
+  return buckets;
+}
+
+export type BucketSimulador = {
+  etiqueta: string;
+  fechaInicio: string;
+  fechaFin: string;
+  diasIncluidos: number;
+  pv_bruta_kWh: number;
+  carga_kWh: number;
+  descarga_kWh: number;
+  perdido_kWh: number;
+  soc_max_kWh: number;
+};
+
+export function agregarDiasDetallePorGranularidad(
+  diario: DiasDetalle,
+  gran: Granularidad,
+): BucketSimulador[] {
+  const fechas = Object.keys(diario).sort();
+  if (fechas.length === 0) return [];
+
+  type Grupo = { etiqueta: string; items: string[] };
+  const grupos = new Map<string, Grupo>();
+
+  for (const f of fechas) {
+    const date = parseISO(f);
+    const { key, etiqueta } = identificador(date, gran);
+    let g = grupos.get(key);
+    if (!g) {
+      g = { etiqueta, items: [] };
+      grupos.set(key, g);
+    }
+    g.items.push(f);
+  }
+
+  const buckets: BucketSimulador[] = [];
+  for (const g of grupos.values()) {
+    g.items.sort();
+    let pv = 0;
+    let carga = 0;
+    let desc = 0;
+    let perd = 0;
+    let socMax = 0;
+    for (const f of g.items) {
+      const d: DiaDetalle | undefined = diario[f];
+      if (!d) continue;
+      for (let i = 0; i < d.gen.length; i++) {
+        pv += d.gen[i];
+        carga += d.carga[i];
+        desc += d.descarga[i];
+        perd += d.perdido[i];
+        if (d.soc[i] > socMax) socMax = d.soc[i];
+      }
+    }
+    buckets.push({
+      etiqueta: g.etiqueta,
+      fechaInicio: g.items[0],
+      fechaFin: g.items[g.items.length - 1],
+      diasIncluidos: g.items.length,
+      pv_bruta_kWh: pv,
+      carga_kWh: carga,
+      descarga_kWh: desc,
+      perdido_kWh: perd,
+      soc_max_kWh: socMax,
+    });
+  }
   buckets.sort((a, b) => a.fechaInicio.localeCompare(b.fechaInicio));
   return buckets;
 }
