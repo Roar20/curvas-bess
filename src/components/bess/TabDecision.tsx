@@ -10,18 +10,30 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const SIM_KEYS = ["250_1000", "300_1200", "400_1600", "500_2000"] as const;
+function isSimulacionPre(v: unknown): v is SimulacionPre {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    "P_kW" in v &&
+    typeof (v as { P_kW: unknown }).P_kW === "number"
+  );
+}
 
 export function TabDecision({ data }: { data: ResumenData }) {
   const e = data.estadisticos_excedente;
-  const sims = SIM_KEYS.map((k) => data.simulaciones[k] as SimulacionPre);
+  const reco = data.recomendacion;
+  const sims = Object.values(data.simulaciones)
+    .filter(isSimulacionPre)
+    .sort((a, b) => a.P_kW - b.P_kW);
+  const simReco =
+    sims.find((s) => s.P_kW === reco.P_kW && s.E_kWh === reco.E_kWh) ?? null;
 
   return (
     <div className="space-y-8">
       <header>
         <h2 className="text-3xl font-semibold text-navy">Argumento técnico para el dimensionamiento</h2>
         <p className="text-muted-foreground mt-1">
-          Toda la evidencia viene de los {fmtN(data.meta.registros_totales)} registros cincominutales de marzo 2026.
+          Toda la evidencia viene de los {fmtN(data.meta.registros_totales)} registros cincominutales de {data.meta.periodo_analizado}.
         </p>
       </header>
 
@@ -36,7 +48,7 @@ export function TabDecision({ data }: { data: ResumenData }) {
               ["P90", `${fmtN(e.diario_p90_kWh)} kWh`],
               ["Máximo", `${fmtN(e.diario_max_kWh)} kWh`],
             ]}
-            conclusion="Capacidad útil objetivo ≈ 1 520 kWh → Nominal con DOD 95% ≈ 1 600 kWh"
+            conclusion={`Capacidad útil objetivo ≈ ${fmtN(reco.E_kWh * (reco.DOD_pct / 100), 0)} kWh — Nominal con DOD ${reco.DOD_pct}% ≈ ${fmtN(reco.E_kWh, 0)} kWh`}
           />
           <ReasoningCard
             title="2. ¿Qué tan rápido sobra?"
@@ -46,7 +58,7 @@ export function TabDecision({ data }: { data: ResumenData }) {
               ["P99 del excedente", `${e.p99_kW.toFixed(1)} kW`],
               ["P95 del excedente", `${e.p95_kW.toFixed(1)} kW`],
             ]}
-            conclusion="Potencia mínima ≈ 250 kW. Subimos a 400 kW por la ventana de descarga (ver pregunta 3)."
+            conclusion={`Potencia mínima ≈ ${fmtN(e.p99_kW, 0)} kW (P99). Recomendada: ${fmtN(reco.P_kW, 0)} kW por la ventana de descarga (ver pregunta 3).`}
           />
           <ReasoningCard
             title="3. ¿Cuántas horas opera la batería?"
@@ -54,19 +66,22 @@ export function TabDecision({ data }: { data: ResumenData }) {
             rows={[
               ["Ventana de carga (promedio)", `${e.duracion_promedio_h.toFixed(2)} h`],
               ["Ventana de descarga", `${(24 - e.h_fin_promedio).toFixed(2)} h`],
-              ["Ratio recomendado", "4 h (1C/4)"],
+              ["Ratio recomendado", `${reco.horas.toFixed(1)} h`],
             ]}
-            conclusion="4 h nominales → P/E = 0.25, descarga completa entre 17h y 21h."
+            conclusion={`${reco.horas.toFixed(1)} h nominales — P/E = ${(1 / reco.horas).toFixed(2)}, descarga completa después del ocaso.`}
           />
           <ReasoningCard
             title="4. ¿La batería se vacía cada noche?"
             subtitle="→ valida operación cíclica"
             rows={[
-              ["SOC final del día", "0 kWh @ 21-22h"],
-              ["Ciclos esperados/año", "343"],
-              ["Vida útil estimada (LFP)", "17.5 años"],
+              ["SOC final del día", "0 kWh tras descarga"],
+              ["Ciclos esperados/año", simReco ? fmtN(simReco.ciclos_ano, 0) : "—"],
+              [
+                `Vida útil estimada (${reco.tecnologia})`,
+                simReco ? `${simReco.vida_util_anos.toFixed(1)} años` : "—",
+              ],
             ]}
-            conclusion="Sí: SOC vuelve a 0 cada noche → operación cíclica completa, sin sulfatación."
+            conclusion="SOC vuelve a 0 cada noche — operación cíclica completa, sin sulfatación."
           />
         </div>
       </div>
@@ -88,7 +103,7 @@ export function TabDecision({ data }: { data: ResumenData }) {
           </TableHeader>
           <TableBody>
             {sims.map((s) => {
-              const isReco = s.P_kW === 400 && s.E_kWh === 1600;
+              const isReco = s.P_kW === reco.P_kW && s.E_kWh === reco.E_kWh;
               return (
                 <TableRow key={`${s.P_kW}_${s.E_kWh}`} className={isReco ? "bg-success/10 font-medium" : ""}>
                   <TableCell>
@@ -111,24 +126,63 @@ export function TabDecision({ data }: { data: ResumenData }) {
         </Table>
       </div>
 
-      <Callout variant="success" title="Configuración recomendada: 400 kW AC / 1 600 kWh / 4 h / LFP / DOD 95%">
+      <Callout
+        variant="success"
+        title={`Configuración recomendada: ${fmtN(reco.P_kW, 0)} kW AC / ${fmtN(reco.E_kWh, 0)} kWh / ${reco.horas.toFixed(1)} h / ${reco.tecnologia} / DOD ${reco.DOD_pct}%`}
+      >
         <ul className="list-disc pl-5 space-y-1">
-          <li>Captura <strong>95.2% del excedente diario</strong>, que es el codo del Pareto.</li>
-          <li>SOC alcanza 95% de la nominal solo 19 de 31 días → margen para días extremos.</li>
-          <li>Descarga 4 horas a 400 kW justo en ventana 17h–21h (peak de demanda y PML).</li>
-          <li>Ciclos esperados <strong>343/año</strong> → vida útil <strong>17.5 años</strong> con LFP.</li>
-          <li>SOC vuelve a 0 cada noche → operación cíclica completa.</li>
-          <li>Energía adicional al POI: <strong>38.8 MWh/mes (+26% vs sin BESS)</strong>.</li>
+          {simReco && (
+            <li>
+              Captura{" "}
+              <strong>{simReco.pct_capturado.toFixed(1)}% del excedente</strong>{" "}
+              en el periodo analizado.
+            </li>
+          )}
+          {simReco && (
+            <li>
+              SOC alcanza 90% de la nominal en{" "}
+              <strong>
+                {simReco.dias_saturado} de {data.meta.dias_analizados} días
+              </strong>{" "}
+              — margen para días extremos.
+            </li>
+          )}
+          {simReco && (
+            <li>
+              Descarga {reco.horas.toFixed(1)} horas a {fmtN(reco.P_kW, 0)} kW
+              en ventana de demanda alta.
+            </li>
+          )}
+          {simReco && (
+            <li>
+              Ciclos esperados <strong>{fmtN(simReco.ciclos_ano, 0)}/año</strong>{" "}
+              — vida útil{" "}
+              <strong>{simReco.vida_util_anos.toFixed(1)} años</strong> con{" "}
+              {reco.tecnologia}.
+            </li>
+          )}
+          <li>SOC vuelve a 0 cada noche — operación cíclica completa.</li>
+          {simReco && (
+            <li>
+              Energía adicional al POI:{" "}
+              <strong>
+                {fmtN(simReco.energia_extra_MWh_mes, 1)} MWh/mes
+              </strong>
+              .
+            </li>
+          )}
         </ul>
       </Callout>
 
       <Callout variant="warning" title="Limitaciones del análisis">
         <ol className="list-decimal pl-5 space-y-1">
-          <li>Solo cubre marzo. Junio-agosto (lluvias) y diciembre-enero (días cortos) bajarán el excedente 30-40%.</li>
-          <li>No considera la curva PML horaria — el modelo asume cobertura plana a $1011/MWh.</li>
+          <li>
+            Periodo analizado: <strong>{data.meta.periodo_analizado}</strong> ({data.meta.dias_analizados} días). Estacionalidad puede modificar el excedente fuera de este rango.
+          </li>
+          <li>No considera la curva PML horaria — el modelo asume cobertura plana al precio configurado.</li>
           <li>No incluye CAPEX/OPEX para LCOE — falta el análisis económico.</li>
           <li>No modela degradación de la batería año a año.</li>
-          <li>Si el BESS también va a hacer regulación de frecuencia, la potencia debería subir a 500 kW.</li>
+          <li>Si el BESS también va a hacer regulación de frecuencia, la potencia debería subir.</li>
         </ol>
       </Callout>
     </div>
@@ -153,7 +207,7 @@ function ReasoningCard({
         ))}
       </div>
       <div className="text-sm bg-success/10 border border-success/30 rounded-lg px-3 py-2 text-foreground">
-        ✓ {conclusion}
+        {conclusion}
       </div>
     </div>
   );
