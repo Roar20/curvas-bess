@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Brand palette — BESS technical */
+    --background: 210 17% 98%;
+    --foreground: 207 95% 18%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 207 95% 18%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 207 95% 18%;
+
+    /* Navy */
+    --primary: 207 95% 18%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 207 95% 18%;
+
+    --muted: 210 30% 94%;
+    --muted-foreground: 215 16% 40%;
+
+    --accent: 211 60% 51%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 14 70% 52%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 25% 88%;
+    --input: 214 25% 88%;
+    --ring: 211 60% 51%;
+
+    --radius: 0.75rem;
+
+    /* Chart palette */
+    --pv: 35 87% 55%;            /* #EF9F27 */
+    --pv-foreground: 0 0% 100%;
+    --charge: 158 49% 58%;       /* #5DCAA5 */
+    --discharge: 211 70% 54%;    /* #378ADD */
+    --soc: 244 44% 50%;          /* #534AB7 */
+    --warning: 14 70% 52%;       /* #D85A30 */
+    --success: 158 70% 36%;      /* #1D9E75 */
+    --navy: 207 95% 18%;         /* #02355A */
+    --navy-light: 211 50% 37%;   /* #185FA5 */
+    --sky: 211 60% 51%;          /* #3680CE */
+    --sky-soft: 211 71% 72%;     /* #85B7EB */
+
+    --shadow-card: 0 1px 3px 0 hsl(207 95% 18% / 0.06), 0 1px 2px -1px hsl(207 95% 18% / 0.04);
+    --shadow-elevated: 0 10px 30px -12px hsl(207 95% 18% / 0.18);
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 207 95% 18%;
+    --sidebar-primary: 207 95% 18%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 207 95% 18%;
+    --sidebar-border: 214 25% 88%;
+    --sidebar-ring: 211 60% 51%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  h1, h2, h3 { @apply tracking-tight; }
+}
+
+@layer components {
+  .metric-card {
+    @apply bg-card rounded-xl p-5 border border-border;
+    box-shadow: var(--shadow-card);
+  }
+  .metric-value {
+    @apply text-3xl font-semibold text-navy tabular-nums tracking-tight;
+  }
+  .metric-label {
+    @apply text-xs uppercase tracking-wider text-muted-foreground font-medium;
+  }
+}

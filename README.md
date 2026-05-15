@@ -1,2 +1,3 @@
-# curvas-bess
-Consultoria Baterias
+# Welcome to your Lovable project
+
+TODO: Document your project here
