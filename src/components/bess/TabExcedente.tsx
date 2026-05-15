@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ResumenData } from "@/types/bess";
 import { MetricCard } from "./MetricCard";
 import { fmtN } from "@/lib/bess-sim";
@@ -38,6 +38,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RangeSlider } from "@/components/ui/range-slider";
 
 const THRESHOLD = 1520;
 const BINS = [
@@ -99,8 +100,30 @@ function BucketTooltip({ active, payload }: TooltipProps) {
   );
 }
 
+function percentil(arr: number[], p: number): number {
+  if (arr.length === 0) return 0;
+  const sorted = [...arr].sort((a, b) => a - b);
+  const idx = Math.max(
+    0,
+    Math.min(sorted.length - 1, Math.floor(p * (sorted.length - 1))),
+  );
+  return sorted[idx];
+}
+
+function promedio(arr: number[]): number {
+  if (arr.length === 0) return 0;
+  let s = 0;
+  for (const v of arr) s += v;
+  return s / arr.length;
+}
+
+function maxArr(arr: number[]): number {
+  let m = -Infinity;
+  for (const v of arr) if (v > m) m = v;
+  return m === -Infinity ? 0 : m;
+}
+
 export function TabExcedente({ data }: { data: ResumenData }) {
-  const e = data.estadisticos_excedente;
   const dias = data.meta.dias_analizados;
   const disponibles = useMemo(() => granularidadesDisponibles(dias), [dias]);
   const [gran, setGran] = useState<Granularidad>(() => {
@@ -113,6 +136,53 @@ export function TabExcedente({ data }: { data: ResumenData }) {
   const buckets = useMemo(
     () => agregarPorGranularidad(data.excedente_diario, gran),
     [data.excedente_diario, gran],
+  );
+
+  const [rango, setRango] = useState<[number, number]>([0, 0]);
+  useEffect(() => {
+    setRango([0, Math.max(0, buckets.length - 1)]);
+  }, [buckets.length]);
+
+  const rangoVisible: [number, number] = useMemo(() => {
+    if (buckets.length === 0) return [0, 0];
+    const lo = Math.max(0, Math.min(rango[0], buckets.length - 1));
+    const hi = Math.max(lo, Math.min(rango[1], buckets.length - 1));
+    return [lo, hi];
+  }, [rango, buckets.length]);
+
+  const bucketsVisibles = useMemo(
+    () => buckets.slice(rangoVisible[0], rangoVisible[1] + 1),
+    [buckets, rangoVisible],
+  );
+
+  const fechaInicioVisible = bucketsVisibles[0]?.fechaInicio ?? "—";
+  const fechaFinVisible =
+    bucketsVisibles[bucketsVisibles.length - 1]?.fechaFin ?? "—";
+  const etiquetaInicioVisible = bucketsVisibles[0]?.etiqueta ?? "—";
+  const etiquetaFinVisible =
+    bucketsVisibles[bucketsVisibles.length - 1]?.etiqueta ?? "—";
+
+  const diasVisibles = useMemo(() => {
+    if (bucketsVisibles.length === 0) return [];
+    return data.excedente_diario.filter(
+      (d) =>
+        d.fecha >= fechaInicioVisible && d.fecha <= fechaFinVisible,
+    );
+  }, [data.excedente_diario, bucketsVisibles, fechaInicioVisible, fechaFinVisible]);
+
+  const excedentesVisibles = useMemo(
+    () => diasVisibles.map((d) => d.excedente_kWh),
+    [diasVisibles],
+  );
+
+  const stats = useMemo(
+    () => ({
+      promedio: promedio(excedentesVisibles),
+      mediana: percentil(excedentesVisibles, 0.5),
+      p90: percentil(excedentesVisibles, 0.9),
+      maximo: maxArr(excedentesVisibles),
+    }),
+    [excedentesVisibles],
   );
 
   const histo = useMemo(
@@ -128,7 +198,15 @@ export function TabExcedente({ data }: { data: ResumenData }) {
 
   const esDia = gran === "dia";
   const tituloCard = `Excedente por ${ETIQUETA_GRAN[gran].toLowerCase()} (kWh)`;
-  const tituloTabla = `Tabla completa de ${ARTICULO_PLURAL_GRAN[gran]} ${buckets.length} ${PLURAL_GRAN[gran]}`;
+  const subtituloCard =
+    bucketsVisibles.length > 0
+      ? `${fechaInicioVisible} a ${fechaFinVisible} · ${bucketsVisibles.length} ${PLURAL_GRAN[gran]}`
+      : "Sin datos";
+  const tituloTabla = `Tabla completa de ${ARTICULO_PLURAL_GRAN[gran]} ${bucketsVisibles.length} ${PLURAL_GRAN[gran]}`;
+
+  const mostrarSlider =
+    buckets.length > 1 &&
+    (gran === "dia" ? buckets.length > 30 : buckets.length > 7);
 
   return (
     <div className="space-y-8">
@@ -143,15 +221,18 @@ export function TabExcedente({ data }: { data: ResumenData }) {
       </header>
 
       <div
-        className="bg-card rounded-xl border border-border p-5"
+        className="bg-card rounded-xl border border-border p-5 space-y-4"
         style={{ boxShadow: "var(--shadow-card)" }}
       >
         <Tabs
           value={gran}
           onValueChange={(v) => setGran(v as Granularidad)}
         >
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <h3 className="text-lg font-semibold text-navy">{tituloCard}</h3>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-navy">{tituloCard}</h3>
+              <p className="text-xs text-muted-foreground">{subtituloCard}</p>
+            </div>
             <TabsList className="h-auto bg-secondary/40 border border-border p-1 rounded-lg">
               {disponibles.map((g) => (
                 <TabsTrigger
@@ -166,10 +247,44 @@ export function TabExcedente({ data }: { data: ResumenData }) {
           </div>
         </Tabs>
 
+        {mostrarSlider && (
+          <div className="space-y-2 pt-2">
+            <div className="flex justify-between items-baseline text-xs">
+              <span className="text-muted-foreground">
+                Rango:{" "}
+                <span className="font-medium text-foreground">
+                  {etiquetaInicioVisible}
+                </span>{" "}
+                →{" "}
+                <span className="font-medium text-foreground">
+                  {etiquetaFinVisible}
+                </span>
+              </span>
+              <span className="text-muted-foreground tabular-nums">
+                {bucketsVisibles.length} de {buckets.length}{" "}
+                {PLURAL_GRAN[gran]}
+              </span>
+            </div>
+            <RangeSlider
+              min={0}
+              max={Math.max(0, buckets.length - 1)}
+              step={1}
+              value={[rangoVisible[0], rangoVisible[1]]}
+              onValueChange={(v) =>
+                setRango([v[0], v[1]] as [number, number])
+              }
+            />
+            <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums">
+              <span>{fechaInicioVisible}</span>
+              <span>{fechaFinVisible}</span>
+            </div>
+          </div>
+        )}
+
         <div style={{ width: "100%", height: 400 }}>
           <ResponsiveContainer>
             <BarChart
-              data={buckets}
+              data={bucketsVisibles}
               margin={{ top: 10, right: 20, left: 0, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -196,7 +311,7 @@ export function TabExcedente({ data }: { data: ResumenData }) {
                 />
               )}
               <Bar dataKey="excedente_kWh" radius={[4, 4, 0, 0]}>
-                {buckets.map((b) => (
+                {bucketsVisibles.map((b) => (
                   <Cell
                     key={`${b.fechaInicio}-${b.fechaFin}`}
                     fill={
@@ -215,18 +330,18 @@ export function TabExcedente({ data }: { data: ResumenData }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <MetricCard
           label="Promedio diario"
-          value={fmtN(e.diario_promedio_kWh)}
+          value={fmtN(stats.promedio)}
           unit="kWh"
         />
         <MetricCard
           label="Mediana"
-          value={fmtN(e.diario_mediana_kWh)}
+          value={fmtN(stats.mediana)}
           unit="kWh"
         />
-        <MetricCard label="P90" value={fmtN(e.diario_p90_kWh)} unit="kWh" />
+        <MetricCard label="P90" value={fmtN(stats.p90)} unit="kWh" />
         <MetricCard
           label="Día crítico (máx)"
-          value={fmtN(e.diario_max_kWh)}
+          value={fmtN(stats.maximo)}
           unit="kWh"
           variant="danger"
         />
@@ -301,7 +416,7 @@ export function TabExcedente({ data }: { data: ResumenData }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.excedente_diario.map((d) => (
+                  {diasVisibles.map((d) => (
                     <TableRow key={d.fecha}>
                       <TableCell>{d.fecha}</TableCell>
                       <TableCell className="text-right tabular-nums">
@@ -331,6 +446,7 @@ export function TabExcedente({ data }: { data: ResumenData }) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Periodo</TableHead>
+                    <TableHead>Fechas</TableHead>
                     <TableHead className="text-right">
                       Excedente (kWh)
                     </TableHead>
@@ -344,13 +460,13 @@ export function TabExcedente({ data }: { data: ResumenData }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {buckets.map((b) => (
+                  {bucketsVisibles.map((b) => (
                     <TableRow key={`${b.fechaInicio}-${b.fechaFin}`}>
-                      <TableCell>
-                        <div className="font-medium">{b.etiqueta}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {b.fechaInicio} a {b.fechaFin}
-                        </div>
+                      <TableCell className="font-medium">
+                        {b.etiqueta}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground tabular-nums">
+                        {b.fechaInicio} a {b.fechaFin}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {fmtN(b.excedente_kWh, 1)}
@@ -365,10 +481,12 @@ export function TabExcedente({ data }: { data: ResumenData }) {
                         {b.dias_con_excedente} de {b.dias_totales}
                       </TableCell>
                       <TableCell className="tabular-nums">
-                        {b.mejor_dia.fecha} · {fmtN(b.mejor_dia.excedente_kWh, 0)} kWh
+                        {b.mejor_dia.fecha} ·{" "}
+                        {fmtN(b.mejor_dia.excedente_kWh, 0)} kWh
                       </TableCell>
                       <TableCell className="tabular-nums">
-                        {b.peor_dia.fecha} · {fmtN(b.peor_dia.excedente_kWh, 0)} kWh
+                        {b.peor_dia.fecha} ·{" "}
+                        {fmtN(b.peor_dia.excedente_kWh, 0)} kWh
                       </TableCell>
                     </TableRow>
                   ))}
