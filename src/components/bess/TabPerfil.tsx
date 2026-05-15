@@ -1,5 +1,6 @@
 import { ResumenData } from "@/types/bess";
 import { hourToHHMM } from "@/lib/bess-sim";
+import { HeatmapDiaHora } from "./HeatmapDiaHora";
 import {
   Area,
   CartesianGrid,
@@ -139,12 +140,29 @@ export function TabPerfil({ data, P_kW, E_kWh }: { data: ResumenData; P_kW: numb
           </div>
           <div className="pt-1">
             {margen >= 0 ? (
-              <Badge className="bg-success text-white hover:bg-success">✅ Cabe en la ventana</Badge>
+              <Badge className="bg-success text-white hover:bg-success">Cabe en la ventana</Badge>
             ) : (
-              <Badge variant="destructive">⚠️ No cabe en la ventana</Badge>
+              <Badge variant="destructive">No cabe en la ventana</Badge>
             )}
           </div>
         </div>
+      </div>
+
+      <div
+        className="bg-card rounded-xl border border-border p-5 space-y-2"
+        style={{ boxShadow: "var(--shadow-card)" }}
+      >
+        <div>
+          <h3 className="text-lg font-semibold text-navy">
+            Mapa de calor: kW promedio por día × hora
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Cada celda es la potencia promedio durante esa hora en ese día (o
+            semana si el periodo es largo). Las celdas más rojas marcan los
+            momentos de mayor inyección.
+          </p>
+        </div>
+        <HeatmapDiaHora data={data} />
       </div>
     </div>
   );
