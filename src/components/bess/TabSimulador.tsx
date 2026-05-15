@@ -17,7 +17,6 @@ import {
   ComposedChart,
   Legend,
   Line,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -37,10 +36,31 @@ interface Props {
   setRTE: (n: number) => void;
 }
 
+type Vista = "dia" | "semana" | "mes";
+
+function sumArr(a: number[]) {
+  let s = 0;
+  for (const v of a) s += v;
+  return s;
+}
+function maxArr(a: number[]) {
+  let m = -Infinity;
+  for (const v of a) if (v > m) m = v;
+  return m === -Infinity ? 0 : m;
+}
+function fechaCorta(fecha: string) {
+  // fecha = "YYYY-MM-DD"
+  return fecha.slice(5);
+}
+
 export function TabSimulador({ data, crudos, P_kW, E_kWh, DOD, RTE, setP, setE, setDOD, setRTE }: Props) {
   const [computing, setComputing] = useState(false);
   const [sim, setSim] = useState<SimResult | null>(null);
-  const [dia, setDia] = useState("2026-03-21");
+  const fechasDisponibles = data.excedente_diario.map((d) => d.fecha);
+  const [dia, setDia] = useState<string>(
+    fechasDisponibles[Math.floor(fechasDisponibles.length / 2)] ?? fechasDisponibles[0] ?? "",
+  );
+  const [vista, setVista] = useState<Vista>("dia");
 
   useEffect(() => {
     if (!crudos) return;
@@ -56,16 +76,53 @@ export function TabSimulador({ data, crudos, P_kW, E_kWh, DOD, RTE, setP, setE, 
   const horas = E_kWh / P_kW;
 
   const diaData: DiaDetalle | null = sim?.diario[dia] ?? null;
+
+  // Días que componen la vista actual.
+  const fechasVista = useMemo<string[]>(() => {
+    if (!sim) return [];
+    const todas = fechasDisponibles.filter((f) => sim.diario[f]);
+    if (vista === "mes") return todas;
+    if (vista === "semana") {
+      const idx = todas.indexOf(dia);
+      if (idx < 0) return todas.slice(0, 7);
+      const start = Math.max(0, Math.min(idx - 3, todas.length - 7));
+      return todas.slice(start, start + 7);
+    }
+    return dia ? [dia] : [];
+  }, [sim, fechasDisponibles, vista, dia]);
+
   const chartData = useMemo(() => {
-    if (!diaData) return [];
-    return diaData.horas.map((h, i) => ({
-      hora: h,
-      gen: diaData.gen[i],
-      carga: diaData.carga[i],
-      descarga: diaData.descarga[i],
-      soc: diaData.soc[i],
-    }));
-  }, [diaData]);
+    if (!sim) return [];
+    if (vista === "dia") {
+      if (!diaData) return [];
+      return diaData.horas.map((h, i) => ({
+        x: `${h}h`,
+        gen: diaData.gen[i],
+        carga: diaData.carga[i],
+        descarga: diaData.descarga[i],
+        perdido: diaData.perdido[i],
+        soc: diaData.soc[i],
+      }));
+    }
+    return fechasVista.map((f) => {
+      const d = sim.diario[f];
+      return {
+        x: fechaCorta(f),
+        gen: sumArr(d.gen),
+        carga: sumArr(d.carga),
+        descarga: sumArr(d.descarga),
+        perdido: sumArr(d.perdido),
+        soc: maxArr(d.soc),
+      };
+    });
+  }, [sim, vista, diaData, fechasVista]);
+
+  const periodoLabel =
+    vista === "dia"
+      ? dia
+      : vista === "semana"
+        ? `${fechasVista[0] ?? ""} a ${fechasVista[fechasVista.length - 1] ?? ""}`
+        : `${fechasVista.length} días`;
 
   const PRECIO_MXN = 1011;
   const factorMes = sim ? 31 / 31 : 1; // ya es mensual
@@ -76,11 +133,10 @@ export function TabSimulador({ data, crudos, P_kW, E_kWh, DOD, RTE, setP, setE, 
   const vida = ciclos_ano > 0 ? Math.min(20, 6000 / ciclos_ano) : 0;
   const socPctNominal = sim ? (100 * sim.soc_max_kWh) / E_kWh : 0;
 
-  const recurso = data.recurso_pv;
-  const totalGenDia = chartData.reduce((s, r) => s + r.gen, 0);
+  const totalGen = chartData.reduce((s, r) => s + r.gen, 0);
   const totalCarga = chartData.reduce((s, r) => s + r.carga, 0);
   const totalDesc = chartData.reduce((s, r) => s + r.descarga, 0);
-  const totalPerd = diaData ? diaData.perdido.reduce((s, x) => s + x, 0) : 0;
+  const totalPerd = chartData.reduce((s, r) => s + r.perdido, 0);
 
   return (
     <div className="grid lg:grid-cols-[320px_1fr] gap-6">
@@ -151,22 +207,42 @@ export function TabSimulador({ data, crudos, P_kW, E_kWh, DOD, RTE, setP, setE, 
           style={{ boxShadow: "var(--shadow-card)" }}
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="font-semibold text-navy">Día seleccionado</h3>
-            <Select value={dia} onValueChange={setDia}>
-              <SelectTrigger className="w-[220px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {data.excedente_diario.map((d) => (
-                  <SelectItem key={d.fecha} value={d.fecha}>
-                    {d.fecha} — {fmtN(d.excedente_kWh, 0)} kWh
-                    {d.fecha === "2026-03-21" ? " · crítico" : ""}
-                    {d.fecha === "2026-03-15" ? " · mediana" : ""}
-                    {d.fecha === "2026-03-10" ? " · mínimo" : ""}
-                  </SelectItem>
+            <div>
+              <h3 className="font-semibold text-navy">Detalle del periodo</h3>
+              <p className="text-xs text-muted-foreground">{periodoLabel}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="inline-flex rounded-lg border border-border bg-secondary/40 p-1">
+                {(["dia", "semana", "mes"] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setVista(v)}
+                    className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                      vista === v
+                        ? "bg-navy text-white"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {v === "dia" ? "Día" : v === "semana" ? "Semana" : "Mes"}
+                  </button>
                 ))}
-              </SelectContent>
-            </Select>
+              </div>
+              {vista !== "mes" && (
+                <Select value={dia} onValueChange={setDia}>
+                  <SelectTrigger className="w-[220px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {data.excedente_diario.map((d) => (
+                      <SelectItem key={d.fecha} value={d.fecha}>
+                        {d.fecha} — {fmtN(d.excedente_kWh, 0)} kWh
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           </div>
 
           <div style={{ width: "100%", height: 380 }}>
@@ -174,10 +250,9 @@ export function TabSimulador({ data, crudos, P_kW, E_kWh, DOD, RTE, setP, setE, 
               <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis
-                  dataKey="hora"
+                  dataKey="x"
                   stroke="hsl(var(--muted-foreground))"
                   fontSize={12}
-                  tickFormatter={(h) => `${h}h`}
                 />
                 <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                 <YAxis
@@ -194,16 +269,11 @@ export function TabSimulador({ data, crudos, P_kW, E_kWh, DOD, RTE, setP, setE, 
                     borderRadius: 8,
                     fontSize: 12,
                   }}
-                  labelFormatter={(h) => `Hora ${h}:00`}
+                  labelFormatter={(x) =>
+                    vista === "dia" ? `Hora ${String(x).replace("h", "")}:00` : `Día ${x}`
+                  }
                 />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <ReferenceLine
-                  yAxisId="left"
-                  y={500}
-                  stroke="hsl(var(--warning))"
-                  strokeDasharray="5 4"
-                  label={{ value: "Techo POI", position: "right", fill: "hsl(var(--warning))", fontSize: 11 }}
-                />
                 <Bar yAxisId="left" dataKey="gen" name="PV bruta" fill="hsl(var(--pv))" radius={[3, 3, 0, 0]} />
                 <Bar yAxisId="left" dataKey="carga" name="Carga BESS" fill="hsl(var(--charge))" radius={[3, 3, 0, 0]} />
                 <Bar yAxisId="left" dataKey="descarga" name="Descarga BESS" fill="hsl(var(--discharge))" radius={[3, 3, 0, 0]} />
@@ -211,17 +281,17 @@ export function TabSimulador({ data, crudos, P_kW, E_kWh, DOD, RTE, setP, setE, 
                   yAxisId="right"
                   type="monotone"
                   dataKey="soc"
-                  name="SOC"
+                  name={vista === "dia" ? "SOC" : "SOC máx diario"}
                   stroke="hsl(var(--soc))"
                   strokeWidth={2.5}
-                  dot={false}
+                  dot={vista !== "dia"}
                 />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <MiniMetric label="Gen PV bruta" value={fmtN(totalGenDia, 0)} unit="kWh" />
+            <MiniMetric label="Gen PV bruta" value={fmtN(totalGen, 0)} unit="kWh" />
             <MiniMetric label="Cargado" value={fmtN(totalCarga, 0)} unit="kWh" />
             <MiniMetric label="Descargado" value={fmtN(totalDesc, 0)} unit="kWh" />
             <MiniMetric label="Perdido" value={fmtN(totalPerd, 0)} unit="kWh" danger />
