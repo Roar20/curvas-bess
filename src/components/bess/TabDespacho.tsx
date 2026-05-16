@@ -221,6 +221,17 @@ export function TabDespacho({ data }: { data: ResumenData }) {
         </div>
       </div>
 
+      <div className="mt-3 px-4 py-2 bg-muted/40 border border-border rounded-md">
+        <p className="text-xs text-muted-foreground">
+          <strong className="text-foreground">Nota técnica:</strong> el área
+          verde (carga) representa más energía total que el área azul
+          (descarga), aunque visualmente los picos parezcan al revés. Esto
+          es porque la batería entrega en menos horas pero a mayor potencia.
+          La descarga es ~85% de la carga por la eficiencia round-trip de la
+          batería LFP.
+        </p>
+      </div>
+
       <DespachoKPIs data={data} />
 
       <DespachoTablaTecnica filas={filas} />
