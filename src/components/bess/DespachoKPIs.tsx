@@ -65,9 +65,7 @@ export function DespachoKPIs({ data }: { data: ResumenData }) {
 
   const dias = data.meta.dias_analizados || 1;
   const energiaPorDia = reco.descargado_kWh / dias;
-  // valor_extra_MXN_mes en cinco-min.ts es realmente el valor del periodo
-  // analizado (descargado_kWh × precioMxnMwh / 1000), no estrictamente mensual.
-  const valorAnual = reco.valor_extra_MXN_mes * (365 / dias);
+  const valorAnual = reco.valor_extra_MXN_periodo * (365 / dias);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
