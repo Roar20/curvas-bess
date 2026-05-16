@@ -9,6 +9,7 @@ import { TabExcedente } from "@/components/bess/TabExcedente";
 import { TabPerfil } from "@/components/bess/TabPerfil";
 import { TabSimulador } from "@/components/bess/TabSimulador";
 import { TabDespacho } from "@/components/bess/TabDespacho";
+import { TabEstrategia } from "@/components/bess/TabEstrategia";
 import { TabPareto } from "@/components/bess/TabPareto";
 import { TabDecision } from "@/components/bess/TabDecision";
 import { storage } from "@/lib/storage";
@@ -143,6 +144,12 @@ const Index = () => {
               Despacho
             </TabsTrigger>
             <TabsTrigger
+              value="estrategia"
+              className="data-[state=active]:bg-navy data-[state=active]:text-white"
+            >
+              Estrategia
+            </TabsTrigger>
+            <TabsTrigger
               value="pareto"
               className="data-[state=active]:bg-navy data-[state=active]:text-white"
             >
@@ -184,6 +191,9 @@ const Index = () => {
           </TabsContent>
           <TabsContent value="despacho" className="mt-6">
             <TabDespacho data={resumen} />
+          </TabsContent>
+          <TabsContent value="estrategia" className="mt-6">
+            <TabEstrategia data={resumen} />
           </TabsContent>
           <TabsContent value="pareto" className="mt-6">
             <TabPareto data={resumen} />
