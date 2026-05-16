@@ -16,12 +16,27 @@ export function hourToHHMM(h: number) {
 }
 
 /**
- * Simulación BESS sobre serie cincominutal.
- * @param crudos datos crudos
- * @param P_kW potencia AC
- * @param E_kWh capacidad nominal
- * @param DOD fracción 0-1
- * @param RTE_total round-trip total (carga × descarga)
+ * Simulación BESS sobre serie cincominutal greedy.
+ *
+ * Convención de unidades en `crudos.data`:
+ *   - timestamp: ISO string
+ *   - gen: kWh por intervalo de 5 min (NO kW)
+ *   - poi: kWh por intervalo de 5 min (techo, NO kW)
+ *
+ * Convención de unidades en `diario[fecha]`:
+ *   - gen[hora]: suma de los 12 intervalos de esa hora, en kWh
+ *   - excedente[hora]: kWh sobre el POI en esa hora
+ *   - carga[hora]: kWh cargados al BESS en esa hora
+ *   - descarga[hora]: kWh descargados al POI en esa hora (AC)
+ *   - soc[hora]: estado de carga en kWh al final del último intervalo de la hora
+ *   - perdido[hora]: kWh de excedente no capturados por límites de P o E
+ *
+ * @param crudos serie cincominutal (con gen y poi en kWh por slot)
+ * @param P_kW potencia AC del BESS
+ * @param E_kWh capacidad nominal del BESS
+ * @param DOD fracción de profundidad de descarga (0-1, default 0.95)
+ * @param RTE_total round-trip total carga × descarga (0-1, default 0.85)
+ * @returns SimResult con totales del periodo + estructura diaria
  */
 export function simularBESS(
   crudos: CrudosData,
@@ -85,11 +100,11 @@ export function simularBESS(
     if (soc > dailySocMax[fecha]) dailySocMax[fecha] = soc;
 
     const d = diario[fecha];
-    d.gen[hora] += gen * DT_H;
+    d.gen[hora] += gen;
     d.excedente[hora] += excedente;
     d.carga[hora] += carga;
     d.descarga[hora] += desc;
-    d.perdido[hora] += excedente - carga;
+    d.perdido[hora] += Math.max(0, excedente - carga);
     // SOC al final del intervalo: tomamos el último valor de la hora
     d.soc[hora] = soc;
   }
