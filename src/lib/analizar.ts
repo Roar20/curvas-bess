@@ -20,6 +20,13 @@ import {
   construirDatosCrudos,
   construirDatosResumen,
 } from "./cinco-min";
+import {
+  compararEstrategias,
+  PRECIO_CEL_MXN_DEFAULT,
+  PRECIO_ENERGIA_MXN_MWH_DEFAULT,
+  PRECIO_POTENCIA_MXN_MW_MES_DEFAULT,
+} from "./estrategia";
+import type { PreciosMercado } from "@/types/bess";
 import type {
   ConfigCliente,
   EstadoAnalisis,
@@ -106,6 +113,25 @@ export async function analizarPlanta(
     },
   });
 
+  // --- Parte 2: comparativa de estrategias de despacho ---
+  const precios: PreciosMercado = {
+    energia_mxn_mwh:
+      cliente.precio_ppa_mxn_mwh > 0
+        ? cliente.precio_ppa_mxn_mwh
+        : PRECIO_ENERGIA_MXN_MWH_DEFAULT,
+    potencia_mxn_mw_mes: PRECIO_POTENCIA_MXN_MW_MES_DEFAULT,
+    cel_mxn: PRECIO_CEL_MXN_DEFAULT,
+  };
+  resumen.parte2 = compararEstrategias(
+    crudos,
+    propuesta.bess_p_kw,
+    propuesta.bess_e_kwh,
+    propuesta.dod_pct,
+    propuesta.rte_pct,
+    resumen.meta.dias_analizados,
+    precios,
+  );
+
   return {
     cliente,
     propuesta,
@@ -180,6 +206,24 @@ export function recalcularConPropuesta(
       perfil_horario_real: estado.parte1.perfil_horario,
     },
   });
+
+  const precios_rec: PreciosMercado = {
+    energia_mxn_mwh:
+      estado.cliente.precio_ppa_mxn_mwh > 0
+        ? estado.cliente.precio_ppa_mxn_mwh
+        : PRECIO_ENERGIA_MXN_MWH_DEFAULT,
+    potencia_mxn_mw_mes: PRECIO_POTENCIA_MXN_MW_MES_DEFAULT,
+    cel_mxn: PRECIO_CEL_MXN_DEFAULT,
+  };
+  resumen_nuevo.parte2 = compararEstrategias(
+    crudos_nuevos,
+    nuevaPropuesta.bess_p_kw,
+    nuevaPropuesta.bess_e_kwh,
+    nuevaPropuesta.dod_pct,
+    nuevaPropuesta.rte_pct,
+    resumen_nuevo.meta.dias_analizados,
+    precios_rec,
+  );
 
   return {
     ...estado,

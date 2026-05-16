@@ -83,6 +83,49 @@ export interface ResumenData {
     escenarios_sugeridos: unknown;
     perfil_horario_real: unknown;
   };
+  /** Resultados de Parte 2 (comparativa de estrategias greedy vs arbitraje) */
+  parte2?: ResultadoParte2;
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Parte 2 — Comparativa de estrategias
+//
+// Los tipos viven aquí (no en lib/estrategia.ts) para evitar un
+// ciclo: types/bess.ts ↔ lib/estrategia.ts ↔ lib/bess-sim.ts ↔
+// types/bess.ts. lib/estrategia.ts re-exporta estos tipos para que
+// el código de aplicación tenga un único punto de import.
+// ──────────────────────────────────────────────────────────────────
+
+export type Estrategia = "greedy" | "arbitraje";
+
+export interface PreciosMercado {
+  energia_mxn_mwh: number;
+  potencia_mxn_mw_mes: number;
+  cel_mxn: number;
+}
+
+export interface IngresoDesglosado {
+  energia_mxn: number;
+  potencia_mxn: number;
+  cels_mxn: number;
+  total_mxn: number;
+  kw_firme_garantizable: number;
+  energia_total_mwh_anual: number;
+  descargado_mwh_anual: number;
+}
+
+export interface ComparativaEstrategia {
+  estrategia: Estrategia;
+  sim: SimResult;
+  ingreso: IngresoDesglosado;
+}
+
+export interface ResultadoParte2 {
+  greedy: ComparativaEstrategia;
+  arbitraje: ComparativaEstrategia;
+  ganadora: Estrategia;
+  ventaja_mxn_anual: number;
+  precios_usados: PreciosMercado;
 }
 
 export interface SimulacionPre {
