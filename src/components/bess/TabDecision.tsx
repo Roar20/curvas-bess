@@ -166,7 +166,7 @@ export function TabDecision({ data }: { data: ResumenData }) {
             <li>
               Energía adicional al POI:{" "}
               <strong>
-                {fmtN(simReco.energia_extra_MWh_periodo, 1)} MWh/mes
+                {fmtN(simReco.energia_extra_MWh_periodo, 1)} MWh en el periodo
               </strong>
               .
             </li>

@@ -354,10 +354,10 @@ export function TabSimulador({
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <MetricCard
-            label="Valor mensual extra"
+            label="Valor promedio mensual"
             value={fmtMXN(valorMes)}
             unit="MXN"
-            hint={`@ $${PRECIO_MXN}/MWh`}
+            hint="Promedio mensualizado del periodo"
           />
           <MetricCard label="Valor anual lineal" value={fmtMXN(valorMes * 12)} unit="MXN" />
           <MetricCard
