@@ -388,9 +388,33 @@ export function construirDatosResumen(
         positivos_dia.length > 0
           ? round(Math.min(...positivos_dia) * 1000, 2)
           : 0,
-      duracion_promedio_h: 0,
-      h_inicio_promedio: 0,
-      h_fin_promedio: 0,
+      duracion_promedio_h: (() => {
+        const dias_con_exc = exc_diario_list.filter((d) => d.excedente_kWh > 0);
+        if (dias_con_exc.length === 0) return 0;
+        return round(
+          dias_con_exc.reduce((acc, d) => acc + d.duracion_h, 0) /
+            dias_con_exc.length,
+          2,
+        );
+      })(),
+      h_inicio_promedio: (() => {
+        const dias_con_exc = exc_diario_list.filter((d) => d.excedente_kWh > 0);
+        if (dias_con_exc.length === 0) return 0;
+        return round(
+          dias_con_exc.reduce((acc, d) => acc + d.h_inicio, 0) /
+            dias_con_exc.length,
+          2,
+        );
+      })(),
+      h_fin_promedio: (() => {
+        const dias_con_exc = exc_diario_list.filter((d) => d.excedente_kWh > 0);
+        if (dias_con_exc.length === 0) return 0;
+        return round(
+          dias_con_exc.reduce((acc, d) => acc + d.h_fin, 0) /
+            dias_con_exc.length,
+          2,
+        );
+      })(),
     },
     excedente_diario: exc_diario_list,
     perfil_horario: perfil_horario_app,
