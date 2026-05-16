@@ -14,11 +14,13 @@ function Card({
   titulo,
   valor,
   unidad,
+  unidadHint,
   subtexto,
 }: {
   titulo: string;
   valor: string;
   unidad?: string;
+  unidadHint?: string;
   subtexto: string;
 }) {
   return (
@@ -27,12 +29,15 @@ function Card({
       style={{ boxShadow: "var(--shadow-card)" }}
     >
       <div className="text-sm font-medium text-muted-foreground">{titulo}</div>
-      <div className="flex items-baseline gap-2">
+      <div className="flex items-baseline gap-2 flex-wrap">
         <div className="text-3xl font-semibold text-navy tabular-nums">
           {valor}
         </div>
         {unidad && (
           <div className="text-sm text-muted-foreground">{unidad}</div>
+        )}
+        {unidadHint && (
+          <div className="text-xs text-muted-foreground">· {unidadHint}</div>
         )}
       </div>
       <div className="text-xs text-muted-foreground leading-relaxed">
@@ -40,6 +45,12 @@ function Card({
       </div>
     </div>
   );
+}
+
+function calificadorCiclos(ciclos: number): string {
+  if (ciclos < 200) return "uso conservador de la batería";
+  if (ciclos < 365) return "uso moderado";
+  return "uso intensivo (>1 ciclo/día promedio)";
 }
 
 export function DespachoKPIs({ data }: { data: ResumenData }) {
@@ -76,6 +87,7 @@ export function DespachoKPIs({ data }: { data: ResumenData }) {
         titulo="Ciclos al año"
         valor={fmtN(reco.ciclos_ano, 0)}
         unidad="ciclos"
+        unidadHint={calificadorCiclos(reco.ciclos_ano)}
         subtexto="Cuántas veces la batería se carga y descarga al año. Una batería LFP típica soporta 6 000 ciclos antes de degradarse."
       />
     </div>
