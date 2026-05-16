@@ -253,8 +253,9 @@ export function construirDatosResumen(
       bess.RTE_pct / 100,
     );
     const cap_util = cfg.E_kWh * (bess.DOD_pct / 100);
-    const ciclos_mes = cap_util > 0 ? sim.descargado_kWh / cap_util : 0;
-    const ciclos_ano = dias > 0 ? ciclos_mes * (365 / dias) : ciclos_mes * 12;
+    const ciclos_periodo = cap_util > 0 ? sim.descargado_kWh / cap_util : 0;
+    const ciclos_ano =
+      dias > 0 ? ciclos_periodo * (365 / dias) : ciclos_periodo * 12;
     const vida_anos =
       ciclos_ano > 0
         ? Math.min(VIDA_MAX_ANOS, CICLOS_EOL_LFP / ciclos_ano)
@@ -274,11 +275,11 @@ export function construirDatosResumen(
       dias_saturado: sim.dias_saturado,
       h_carga_promedio: 0,
       h_desc_promedio: 0,
-      ciclos_mes: round(ciclos_mes, 2),
+      ciclos_periodo: round(ciclos_periodo, 2),
       ciclos_ano: round(ciclos_ano, 1),
       vida_util_anos: round(vida_anos, 1),
-      energia_extra_MWh_mes: round(sim.descargado_kWh / 1000, 2),
-      valor_extra_MXN_mes: round(
+      energia_extra_MWh_periodo: round(sim.descargado_kWh / 1000, 2),
+      valor_extra_MXN_periodo: round(
         sim.descargado_kWh * (precioMxnMwh / 1000),
         0,
       ),

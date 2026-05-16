@@ -99,11 +99,11 @@ export interface SimulacionPre {
   dias_saturado: number;
   h_carga_promedio: number;
   h_desc_promedio: number;
-  ciclos_mes: number;
+  ciclos_periodo: number;
   ciclos_ano: number;
   vida_util_anos: number;
-  energia_extra_MWh_mes: number;
-  valor_extra_MXN_mes: number;
+  energia_extra_MWh_periodo: number;
+  valor_extra_MXN_periodo: number;
 }
 
 export interface DiaDetalle {
